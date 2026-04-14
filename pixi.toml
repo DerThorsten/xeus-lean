@@ -31,7 +31,7 @@ cppzmq = "*"
 #
 [feature.wasm-build]
 platforms = ["linux-64", "osx-arm64"]
-channels = ["https://repo.prefix.dev/emscripten-forge-dev", "conda-forge"]
+channels = ["https://repo.prefix.dev/emscripten-forge-4x", "conda-forge"]
 
 [feature.wasm-build.dependencies]
 cmake = "*"
@@ -41,7 +41,7 @@ cxx-compiler = "*"
 jupyterlite = "*"
 jupyterlite-xeus = "*"
 jupyter_server = "*"
-emscripten_emscripten-wasm32 = "==3.1.73"
+emscripten_emscripten-wasm32 = "==4.0.9"
 
 [feature.wasm-build.tasks]
 fix-emscripten-links = """
@@ -69,14 +69,14 @@ serve = """
 export PREFIX=$CONDA_PREFIX/../wasm-host;
 jupyter lite serve
   --XeusAddon.prefix="$PREFIX"
-  --XeusAddon.default_channels="['https://repo.prefix.dev/emscripten-forge-dev','https://conda.anaconda.org/conda-forge']"
+  --XeusAddon.default_channels="['https://repo.prefix.dev/emscripten-forge-4x','https://conda.anaconda.org/conda-forge']"
   --contents notebooks
 """
 generate = """
 export PREFIX=$CONDA_PREFIX/../wasm-host;
 jupyter lite build
   --XeusAddon.prefix="$PREFIX"
-  --XeusAddon.default_channels="['https://repo.prefix.dev/emscripten-forge-dev','https://conda.anaconda.org/conda-forge']"
+  --XeusAddon.default_channels="['https://repo.prefix.dev/emscripten-forge-4x','https://conda.anaconda.org/conda-forge']"
   --contents notebooks
   --output-dir dist
 """
