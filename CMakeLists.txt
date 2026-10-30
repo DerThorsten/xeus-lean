@@ -646,89 +646,13 @@ if(EMSCRIPTEN)
 else()
     message(STATUS "Building xeus-lean native FFI library")
 
-    # Dependencies
-    # ============
+    # Dependencies (from the conda / pixi environment)
+    # ===============================================
 
-    include(FetchContent)
-
-    # Use system nlohmann_json if available
-    find_package(nlohmann_json QUIET)
-    if(NOT nlohmann_json_FOUND)
-        message(STATUS "System nlohmann_json not found, fetching from GitHub...")
-        FetchContent_Declare(
-            nlohmann_json
-            GIT_REPOSITORY https://github.com/nlohmann/json.git
-            GIT_TAG v3.11.3
-        )
-        FetchContent_MakeAvailable(nlohmann_json)
-        set(JSON_TARGET nlohmann_json)
-    else()
-        set(JSON_TARGET nlohmann_json::nlohmann_json)
-    endif()
-
-    # Fetch xtl (required by xeus)
-    FetchContent_Declare(
-        xtl
-        GIT_REPOSITORY https://github.com/xtensor-stack/xtl.git
-        GIT_TAG 0.7.7
-    )
-
-    # Fetch xeus
-    FetchContent_Declare(
-        xeus
-        GIT_REPOSITORY https://github.com/jupyter-xeus/xeus.git
-        GIT_TAG 5.1.0
-    )
-
-    # Try to find system ZeroMQ first
-    find_package(ZeroMQ QUIET)
-    find_package(cppzmq QUIET)
-
-    if(NOT ZeroMQ_FOUND)
-        message(STATUS "System ZeroMQ not found, fetching from GitHub...")
-        set(WITH_PERF_TOOL OFF CACHE BOOL "")
-        set(ZMQ_BUILD_TESTS OFF CACHE BOOL "")
-        set(ENABLE_CPACK OFF CACHE BOOL "")
-        set(BUILD_TESTS OFF CACHE BOOL "")
-
-        FetchContent_Declare(
-            libzmq
-            GIT_REPOSITORY https://github.com/zeromq/libzmq.git
-            GIT_TAG v4.3.5
-        )
-        FetchContent_MakeAvailable(libzmq)
-    endif()
-
-    if(NOT cppzmq_FOUND)
-        message(STATUS "System cppzmq not found, fetching from GitHub...")
-        set(CPPZMQ_BUILD_TESTS OFF CACHE BOOL "")
-
-        FetchContent_Declare(
-            cppzmq
-            GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
-            GIT_TAG v4.10.0
-        )
-        FetchContent_MakeAvailable(cppzmq)
-    endif()
-
-    # Help xeus-zmq find FetchContent-built ZeroMQ/cppzmq via find_package()
-    if(NOT ZeroMQ_FOUND)
-        set(ZeroMQ_DIR "${CMAKE_BINARY_DIR}/_deps/libzmq-build" CACHE PATH "" FORCE)
-    endif()
-    if(NOT cppzmq_FOUND)
-        set(cppzmq_DIR "${CMAKE_BINARY_DIR}/_deps/cppzmq-build" CACHE PATH "" FORCE)
-    endif()
-
-    # Fetch xeus-zmq
-    FetchContent_Declare(
-        xeus-zmq
-        GIT_REPOSITORY https://github.com/jupyter-xeus/xeus-zmq.git
-        GIT_TAG 3.0.0
-    )
-
-    message(STATUS "Fetching dependencies from GitHub...")
-    FetchContent_MakeAvailable(xtl xeus xeus-zmq)
-    message(STATUS "Dependencies fetched successfully")
+    find_package(nlohmann_json 3.11.3 REQUIRED)
+    set(JSON_TARGET nlohmann_json::nlohmann_json)
+    find_package(xeus 6.0 REQUIRED)
+    find_package(xeus-zmq 4.0 REQUIRED)
 
     # Lean Integration
     # ================
@@ -761,7 +685,7 @@ else()
     target_compile_features(xeus_ffi PRIVATE cxx_std_17)
 
     # Link with xeus
-    target_link_libraries(xeus_ffi PUBLIC xeus-static)
+    target_link_libraries(xeus_ffi PUBLIC xeus)
     target_link_libraries(xeus_ffi PUBLIC xeus-zmq)
     target_link_libraries(xeus_ffi PUBLIC ${JSON_TARGET})
     target_include_directories(xeus_ffi PUBLIC ${LEAN_INCLUDE_DIR})

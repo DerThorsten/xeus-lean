@@ -196,7 +196,6 @@ public:
         // Lean lexer (`lean`) so any nbconvert/nbviewer rendering uses
         // accurate highlighting.
         return xeus::create_info_reply(
-            "",
             "xlean",
             "0.1.0",
             "lean",
@@ -204,14 +203,20 @@ public:
             "text/x-haskell",   // mimetype — picked up by CodeMirror
             ".lean",
             "lean",             // pygments_lexer (used by nbconvert)
-            "haskell",          // codemirror_mode (used by JupyterLab)
+            std::string("haskell"),  // codemirror_mode (used by JupyterLab)
+            "",                 // nbconvert_exporter
             "Lean 4 Jupyter Kernel"
         );
     }
 
-    void shutdown_request_impl() override {
+    nl::json shutdown_request_impl(bool restart) override {
         DEBUG_LOG("[C++ FFI] Shutdown requested");
         m_should_stop = true;
+        return xeus::create_shutdown_reply(restart);
+    }
+
+    nl::json interrupt_request_impl() override {
+        return xeus::create_successful_reply();
     }
 
     // Methods for Lean to call
