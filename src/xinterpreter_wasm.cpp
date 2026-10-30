@@ -965,7 +965,6 @@ nl::json interpreter::kernel_info_request_impl()
 {
     std::cerr << "[WASM] kernel_info_request_impl: ENTER" << std::endl;
     return xeus::create_info_reply(
-        "",                              // protocol version (auto-filled)
         "xlean",                         // implementation
         "0.1.0",                         // implementation_version
         "lean",                          // language name
@@ -973,12 +972,13 @@ nl::json interpreter::kernel_info_request_impl()
         "text/x-lean4",                  // mimetype
         ".lean",                         // file_extension
         "haskell",                       // pygments_lexer (Lean 4 ~ Haskell)
-        "haskell",                       // codemirror_mode (best available match)
+        std::string("haskell"),          // codemirror_mode (best available match)
+        "",                              // nbconvert_exporter
         "Lean 4 Jupyter Kernel (WASM)"   // banner
     );
 }
 
-void interpreter::shutdown_request_impl()
+nl::json interpreter::shutdown_request_impl(bool restart)
 {
     std::cerr << "[WASM] shutdown_request_impl: ENTER" << std::endl;
     if (m_repl_state) {
@@ -986,6 +986,13 @@ void interpreter::shutdown_request_impl()
         m_repl_state = nullptr;
     }
     m_initialized = false;
+    return xeus::create_shutdown_reply(restart);
+}
+
+nl::json interpreter::interrupt_request_impl()
+{
+    // the single-threaded wasm REPL cannot be interrupted
+    return xeus::create_successful_reply();
 }
 
 }  // namespace xeus_lean

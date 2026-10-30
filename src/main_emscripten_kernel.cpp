@@ -12,7 +12,7 @@
 #include <emscripten/bind.h>
 
 #include "xeus-lean/xinterpreter_wasm.hpp"
-#include "xeus-lite/xembind.hpp"
+#include "xeus/xembind.hpp"
 
 EMSCRIPTEN_BINDINGS(my_module) {
     xeus::export_core();

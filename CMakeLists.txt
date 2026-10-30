@@ -37,80 +37,12 @@ if(EMSCRIPTEN)
     set(CMAKE_SHARED_LINKER_FLAGS "-sMEMORY64")
     set(CMAKE_MODULE_LINKER_FLAGS "-sMEMORY64")
 
-    # Dependencies (built from source for Memory64/wasm64 compatibility)
-    # ===================================================================
+    # Dependencies (from the emscripten-forge environment)
+    # ==================================================
 
-    include(FetchContent)
-    # Allow FetchContent_Populate (needed to patch sources before add_subdirectory)
-    cmake_policy(SET CMP0169 OLD)
-
-    # nlohmann_json (header-only, no recompilation needed)
-    find_package(nlohmann_json QUIET)
-    if(NOT nlohmann_json_FOUND)
-        FetchContent_Declare(nlohmann_json
-            GIT_REPOSITORY https://github.com/nlohmann/json.git
-            GIT_TAG v3.12.0
-            EXCLUDE_FROM_ALL)
-        set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-        set(JSON_Install OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(nlohmann_json)
-    endif()
-
-    # xtl (header-only, required by xeus)
-    FetchContent_Declare(xtl
-        GIT_REPOSITORY https://github.com/xtensor-stack/xtl.git
-        GIT_TAG 0.7.7)
-    FetchContent_MakeAvailable(xtl)
-
-    # xeus (must be compiled from source for wasm64)
-    set(XEUS_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(XEUS_STATIC_DEPENDENCIES ON CACHE BOOL "" FORCE)
-    set(XEUS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(xeus
-        GIT_REPOSITORY https://github.com/jupyter-xeus/xeus.git
-        GIT_TAG 5.2.6)
-    # Use Populate + patch + add_subdirectory instead of MakeAvailable
-    # to fix export(EXPORT)/install(EXPORT) failures in FetchContent builds
-    # (nlohmann_json built with EXCLUDE_FROM_ALL is not in any export set)
-    FetchContent_GetProperties(xeus)
-    if(NOT xeus_POPULATED)
-        FetchContent_Populate(xeus)
-        file(READ "${xeus_SOURCE_DIR}/CMakeLists.txt" _xeus_cml)
-        string(REGEX REPLACE "export\\(EXPORT [^)]+\\)" "# export(EXPORT) disabled for FetchContent" _xeus_cml "${_xeus_cml}")
-        string(REGEX REPLACE "install\\(EXPORT [^)]+\\)" "# install(EXPORT) disabled for FetchContent" _xeus_cml "${_xeus_cml}")
-        # Fix: add EMSCRIPTEN guard for -lutil -lrt (not available in wasm)
-        string(REPLACE "UNIX AND NOT APPLE)" "UNIX AND NOT APPLE AND NOT EMSCRIPTEN)" _xeus_cml "${_xeus_cml}")
-        file(WRITE "${xeus_SOURCE_DIR}/CMakeLists.txt" "${_xeus_cml}")
-        add_subdirectory(${xeus_SOURCE_DIR} ${xeus_BINARY_DIR} EXCLUDE_FROM_ALL)
-    endif()
-
-    # Add xeus cmake modules to path (WasmBuildOptions.cmake needed by xeus-lite)
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}/_deps/xeus-src/cmake")
-
-    # xeus-lite (must be compiled from source for wasm64)
-    # Create shim config so xeus-lite's find_package(xeus 5.0.0) succeeds
-    # (xeus targets are already available from FetchContent above)
-    file(WRITE "${CMAKE_BINARY_DIR}/xeus-shim/xeusConfig.cmake"
-        "set(xeus_FOUND TRUE)\nset(xeus_VERSION \"5.2.6\")\n")
-    file(WRITE "${CMAKE_BINARY_DIR}/xeus-shim/xeusConfigVersion.cmake"
-        "set(PACKAGE_VERSION \"5.2.6\")\nset(PACKAGE_VERSION_COMPATIBLE TRUE)\nset(PACKAGE_VERSION_EXACT FALSE)\n")
-    set(xeus_DIR "${CMAKE_BINARY_DIR}/xeus-shim" CACHE PATH "" FORCE)
-
-    set(XEUS_LITE_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(XEUS_LITE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(xeus-lite
-        GIT_REPOSITORY https://github.com/jupyter-xeus/xeus-lite.git
-        GIT_TAG 3.2.1)
-    # Same FetchContent export fix as xeus above
-    FetchContent_GetProperties(xeus-lite)
-    if(NOT xeus-lite_POPULATED)
-        FetchContent_Populate(xeus-lite)
-        file(READ "${xeus-lite_SOURCE_DIR}/CMakeLists.txt" _xlite_cml)
-        string(REGEX REPLACE "export\\(EXPORT [^)]+\\)" "# export(EXPORT) disabled for FetchContent" _xlite_cml "${_xlite_cml}")
-        string(REGEX REPLACE "install\\(EXPORT [^)]+\\)" "# install(EXPORT) disabled for FetchContent" _xlite_cml "${_xlite_cml}")
-        file(WRITE "${xeus-lite_SOURCE_DIR}/CMakeLists.txt" "${_xlite_cml}")
-        add_subdirectory(${xeus-lite_SOURCE_DIR} ${xeus-lite_BINARY_DIR} EXCLUDE_FROM_ALL)
-    endif()
+    find_package(nlohmann_json 3.11.3 REQUIRED)
+    find_package(xeus 6.0 REQUIRED)
+    find_package(xeus-lite REQUIRED)
 
     # Build libleanrt from lean4 source
     # ==================================
@@ -135,7 +67,7 @@ if(EMSCRIPTEN)
     )
 
     target_link_libraries(xeus-lean-static
-        PUBLIC xeus-static
+        PUBLIC xeus
         PUBLIC nlohmann_json::nlohmann_json
         PUBLIC ${LEANRT_LIB}
     )
@@ -285,8 +217,10 @@ if(EMSCRIPTEN)
         # _xleanSkipExpandedCache flag for the actual workaround.
         PUBLIC "SHELL: -s MAXIMUM_MEMORY=4gb"
         PUBLIC "SHELL: -s WASM_BIGINT"
-        PUBLIC "SHELL: -s EXPORTED_RUNTIME_METHODS='[\"FS\",\"ENV\",\"PATH\",\"ERRNO_CODES\"]'"
+        PUBLIC "SHELL: -s EXPORTED_RUNTIME_METHODS='[\"FS\",\"ENV\",\"PATH\",\"ERRNO_CODES\",\"getExceptionMessage\",\"getCppExceptionTag\"]'"
         PUBLIC "SHELL: -s FORCE_FILESYSTEM"
+        # libxeus from emscripten-forge is a shared library (side module)
+        PUBLIC "SHELL: -s MAIN_MODULE=1"
         # No -s ASYNCIFY=*.  We tried both:
         # * ASYNCIFY=1 (binaryen pass) UNREACHABLEs at
         #   Asyncify.cpp:1142 when combined with -sMEMORY64=1 (the

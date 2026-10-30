@@ -532,49 +532,14 @@ extern \"C\" LEAN_EXPORT lean_obj_res lean_uv_udp_cancel_recv(b_obj_arg socket) 
         -Wno-unused-but-set-variable
     )
 
-    # GMP: build mini-gmp from GMP source for wasm64 compatibility
-    # mini-gmp is a portable, single-file GMP subset that works on any platform.
-    # Full GMP uses arch-specific assembly; mini-gmp is pure C.
-    #
-    # FetchContent's URL accepts a list and tries each in order, so we
-    # fall back through ftp.gnu.org → gmplib.org → ftpmirror.gnu.org.
-    # ftp.gnu.org is intermittently unreachable from some networks and
-    # the local docker build was failing on it; gmplib.org is the
-    # upstream-recommended primary site anyway.
-    set(GMP_VERSION "6.3.0")
-    FetchContent_Declare(gmp
-        URL
-            "https://gmplib.org/download/gmp/gmp-${GMP_VERSION}.tar.xz"
-            "https://ftpmirror.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz"
-            "https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz"
-        URL_HASH SHA256=a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    FetchContent_GetProperties(gmp)
-    if(NOT gmp_POPULATED)
-        FetchContent_Populate(gmp)
-    endif()
-
-    set(MINI_GMP_DIR "${gmp_SOURCE_DIR}/mini-gmp")
-    if(EXISTS "${MINI_GMP_DIR}/mini-gmp.c")
-        # Build mini-gmp as a static library
-        add_library(mini-gmp STATIC "${MINI_GMP_DIR}/mini-gmp.c")
-        target_include_directories(mini-gmp PUBLIC "${MINI_GMP_DIR}")
-        target_compile_options(mini-gmp PRIVATE -O2 -fPIC)
-
-        # Create a gmp.h shim that includes mini-gmp.h
-        # (lean4 #includes <gmp.h>, mini-gmp provides mini-gmp.h)
-        set(GMP_SHIM_DIR "${CMAKE_CURRENT_BINARY_DIR}/gmp-shim")
-        file(MAKE_DIRECTORY "${GMP_SHIM_DIR}")
-        file(WRITE "${GMP_SHIM_DIR}/gmp.h"
-            "#pragma once\n#include \"mini-gmp.h\"\n")
-
-        target_link_libraries(leanrt_wasm PUBLIC mini-gmp)
-        target_include_directories(leanrt_wasm PUBLIC "${GMP_SHIM_DIR}" "${MINI_GMP_DIR}")
-        target_compile_definitions(leanrt_wasm PUBLIC LEAN_USE_GMP)
-        message(STATUS "mini-gmp ${GMP_VERSION} configured for wasm64")
-    else()
-        message(WARNING "mini-gmp not found in GMP source - .olean files will be incompatible")
-    endif()
+    # GMP from the emscripten-forge environment (gmp-static, generic C limbs).
+    # LEAN_USE_GMP is required: .olean files store big numbers as GMP mpz.
+    find_path(GMP_INCLUDE_DIR gmp.h REQUIRED)
+    find_library(GMP_LIBRARY NAMES libgmp.a gmp REQUIRED)
+    target_include_directories(leanrt_wasm PUBLIC "${GMP_INCLUDE_DIR}")
+    target_link_libraries(leanrt_wasm PUBLIC "${GMP_LIBRARY}")
+    target_compile_definitions(leanrt_wasm PUBLIC LEAN_USE_GMP)
+    message(STATUS "gmp: ${GMP_LIBRARY}")
 
     # Return values
     set(${out_lib} leanrt_wasm PARENT_SCOPE)
