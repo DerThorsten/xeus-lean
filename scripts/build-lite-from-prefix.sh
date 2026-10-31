@@ -8,25 +8,18 @@
 #   pixi exec --spec jupyterlite-core --spec jupyterlite-xeus --spec notebook \
 #     bash scripts/build-lite-from-prefix.sh <prefix> _output
 #
-# jupyterlite-xeus copies the kernel binaries to xeus/<env>/bin/, but not the
-# olean tarballs; src/post.js fetches them from xeus/<env>/olean/
-# (relative to xlean.js), so they are copied there explicitly.
+# This is a plain jupyterlite-xeus build: the olean tarballs (xeus-lean-data)
+# are mounted into the kernel FS like any other package, and the kernel
+# unpacks them from /share/jupyter/olean at startup.
 set -euo pipefail
 
 PREFIX="$(cd "${1:?usage: $0 <prefix> <output-dir> [contents-dir]}" && pwd)"
 OUT="${2:?usage: $0 <prefix> <output-dir> [contents-dir]}"
 CONTENTS="${3:-$(dirname "$0")/../notebooks}"
-ENV_NAME="$(basename "$PREFIX")"
 
 jupyter lite build \
     --XeusAddon.prefix="$PREFIX" \
     --contents "$CONTENTS" \
     --output-dir "$OUT"
 
-mkdir -p "$OUT/xeus/$ENV_NAME/olean"
-cp "$PREFIX"/share/jupyter/olean/*-olean.tar.zst \
-   "$PREFIX"/share/jupyter/olean/manifest-v2.json \
-   "$OUT/xeus/$ENV_NAME/olean/"
-
 echo "kernels: $(cat "$OUT/xeus/kernels.json")"
-ls -lh "$OUT/xeus/$ENV_NAME/bin" "$OUT/xeus/$ENV_NAME/olean"

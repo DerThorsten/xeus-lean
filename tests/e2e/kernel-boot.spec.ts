@@ -47,6 +47,28 @@ test.describe('xlean kernel boot', () => {
     await expect(check).toContainText('Nat.succ');
   });
 
+  // Without Init loaded, `Nat` silently becomes an auto-bound implicit and
+  // every numeral fails with "Unknown constant `OfNat`".
+  test('Init is loaded (function definition with numerals)', async ({ page }) => {
+    await openLeanNotebook(page, 'kernel-smoke.ipynb');
+    const out = await runCell(
+      page,
+      [
+        '-- Define a simple function',
+        'def double (n : Nat) : Nat := n + n',
+        '',
+        '-- Check its type',
+        '#check double',
+        '',
+        '-- Evaluate it',
+        '#eval double 21',
+      ].join('\n')
+    );
+    await expect(out).toContainText('double (n : Nat) : Nat');
+    await expect(out).toContainText('42');
+    await expect(out).not.toContainText('Unknown constant');
+  });
+
   test('Std oleans load', async ({ page }) => {
     await openLeanNotebook(page, 'kernel-smoke.ipynb');
     const out = await runCell(
