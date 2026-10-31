@@ -322,6 +322,17 @@ void interpreter::configure_impl()
     // cache.  That runs in `Module.preRun` and blocks WASM main()
     // via `addRunDependency`, so by the time we get here the VFS
     // already has every Init/Std/Lean/Sparkle/Hesper olean.
+    //
+    // A plain jupyterlite-xeus deployment does not serve the tarballs
+    // over HTTP, but mounts the xeus-lean package into the FS before
+    // the kernel is configured: load them from there in that case.
+    EM_ASM({
+        if (!FS.analyzePath('/lib/lean/Init.olean').exists &&
+            typeof Module.xleanLoadOleansFromFS === 'function') {
+            var n = Module.xleanLoadOleansFromFS('/share/jupyter/olean');
+            console.error('[WASM] oleans loaded from FS: ' + n + ' files');
+        }
+    });
     test_hash_tables();
     initialize_lean_runtime();
     std::cerr << "[WASM] configure_impl: EXIT" << std::endl;

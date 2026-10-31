@@ -813,3 +813,81 @@ Module.preRun.push(function () {
     try { xleanRemoveRunDependency(depTag); } catch (_) {}
   });
 });
+
+// ---------------------------------------------------------------
+// Olean loading from the kernel's virtual filesystem.
+//
+// In a plain jupyterlite-xeus deployment the olean tarballs are not
+// served next to xlean.js (jupyterlite-xeus only copies the kernel
+// binaries), so the HTTP loader above finds no manifest.  They are
+// however part of the xeus-lean package, which jupyterlite-xeus mounts
+// into the kernel FS (<prefix>/share/jupyter/olean/) before the kernel
+// is configured.  configure_impl calls this (synchronously) when
+// /lib/lean/Init.olean is still missing.
+// ---------------------------------------------------------------
+Module.xleanLoadOleansFromFS = function (dir) {
+  function log(msg) { try { console.error('[olean-fs] ' + msg); } catch (_) {} }
+  var manifestPath = dir + '/manifest-v2.json';
+  var manifest;
+  try {
+    manifest = JSON.parse(FS.readFile(manifestPath, { encoding: 'utf8' }));
+  } catch (e) {
+    log('no ' + manifestPath + ': ' + e);
+    return 0;
+  }
+  if (typeof fzstd === 'undefined' || typeof fzstd.decompress !== 'function') {
+    log('fzstd not available');
+    return 0;
+  }
+  var madeDirs = Object.create(null);
+  function ensureDir(path) {
+    if (madeDirs[path]) return;
+    var parts = path.split('/').filter(Boolean);
+    var cur = '';
+    for (var i = 0; i < parts.length; i++) {
+      cur += '/' + parts[i];
+      if (madeDirs[cur]) continue;
+      try { FS.mkdir(cur); } catch (e) { /* exists */ }
+      madeDirs[cur] = 1;
+    }
+  }
+  var total = 0;
+  Object.keys(manifest.modules || {}).forEach(function (mod) {
+    var asset = dir + '/' + manifest.modules[mod].asset;
+    try {
+      var raw = fzstd.decompress(FS.readFile(asset));
+      // ustar regular files only (same layout as the HTTP loader)
+      var off = 0, written = 0;
+      while (off + 512 <= raw.length) {
+        var nameEnd = off;
+        while (nameEnd < off + 100 && raw[nameEnd] !== 0) nameEnd++;
+        if (nameEnd === off) break;
+        var name = '';
+        for (var i = off; i < nameEnd; i++) name += String.fromCharCode(raw[i]);
+        var sizeStr = '';
+        for (var j = off + 124; j < off + 136; j++) {
+          var c = raw[j];
+          if (c === 0 || c === 32) break;
+          sizeStr += String.fromCharCode(c);
+        }
+        var size = parseInt(sizeStr, 8) || 0;
+        var typeflag = raw[off + 156];
+        if (typeflag === 0 || typeflag === 0x30) {
+          var slash = name.lastIndexOf('/');
+          var d = slash > 0 ? '/lib/lean/' + name.substring(0, slash) : '/lib/lean';
+          ensureDir(d);
+          try {
+            FS.createDataFile(d, name.substring(slash + 1), raw.subarray(off + 512, off + 512 + size), true, false, true);
+            written++;
+          } catch (e) { /* exists */ }
+        }
+        off += 512 + Math.ceil(size / 512) * 512;
+      }
+      log(mod + ': ' + written + ' files from ' + asset);
+      total += written;
+    } catch (e) {
+      log(mod + ': failed: ' + e);
+    }
+  });
+  return total;
+};
