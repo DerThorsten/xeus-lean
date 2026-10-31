@@ -35,9 +35,13 @@ test.describe('xlean kernel boot', () => {
     const sum = await runCell(page, '#eval 1 + 1');
     await expect(sum).toContainText('2');
 
-    await runCell(page, 'def x := 21');
-    const prod = await runCell(page, '#eval x * 2');
+    // runCell waits for output, and a bare `def` produces none
+    const prod = await runCell(page, 'def x := 21\n#eval x * 2');
     await expect(prod).toContainText('42');
+
+    // definitions persist across cells
+    const next = await runCell(page, '#eval x + 1');
+    await expect(next).toContainText('22');
 
     const check = await runCell(page, '#check Nat.succ');
     await expect(check).toContainText('Nat.succ');
