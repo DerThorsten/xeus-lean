@@ -633,11 +633,19 @@ if(EMSCRIPTEN)
             OPTIONAL)
 
     # Install kernel spec
+    # jupyterlite-xeus locates <argv[0]>.js / .wasm, so argv[0] must be the
+    # full path of the installed kernel binary (as done by xeus-python)
     set(XJUPYTER_DATA_DIR "share/jupyter" CACHE STRING "Jupyter data directory")
+    set(XEUS_LEAN_KERNELSPEC_PATH "${CMAKE_INSTALL_FULL_BINDIR}/")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/share/jupyter/kernels/xlean/kernel.json.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/share/jupyter/kernels/xlean/kernel.json")
     set(KERNELSPEC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/share/jupyter/kernels)
     install(DIRECTORY ${KERNELSPEC_DIR}
             DESTINATION ${XJUPYTER_DATA_DIR}
             PATTERN "*.in" EXCLUDE)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/share/jupyter/kernels/xlean/kernel.json"
+            DESTINATION ${XJUPYTER_DATA_DIR}/kernels/xlean)
 
 # ============================================================================
 # NATIVE BUILD (existing)
