@@ -244,10 +244,11 @@ if(EMSCRIPTEN)
     target_link_options(xlean
         PUBLIC "SHELL: --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/pre.js"
         # Order matters: fzstd defines `self.fzstd`/`globalThis.fzstd` and
-        # post.js consumes it. Both files end up as separate scripts inside
-        # the emscripten worker bundle and run in declaration order.
-        PUBLIC "SHELL: --post-js ${CMAKE_CURRENT_SOURCE_DIR}/src/fzstd.umd.js"
-        PUBLIC "SHELL: --post-js ${CMAKE_CURRENT_SOURCE_DIR}/src/post.js"
+        # post.js consumes it. They run in declaration order.
+        # post.js registers the olean loader in Module.preRun, so it has to
+        # be a --pre-js: newer emscripten runs preRun before --post-js code.
+        PUBLIC "SHELL: --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/fzstd.umd.js"
+        PUBLIC "SHELL: --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/post.js"
     )
 
     # Embed Lean .olean files for Init module

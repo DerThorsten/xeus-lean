@@ -14,7 +14,9 @@ import * as path from 'path';
  * `baseURL`.
  */
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../_output');
+const OUTPUT_DIR = path.resolve(
+  process.env.XEUS_LEAN_E2E_OUTPUT ?? path.join(__dirname, '../../_output')
+);
 const OUTPUT_PORT = Number(process.env.XEUS_LEAN_E2E_PORT ?? 8765);
 
 export default defineConfig({

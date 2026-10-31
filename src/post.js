@@ -1,10 +1,14 @@
 // getDylinkMetadata is only available with MAIN_MODULE (dynamic linking).
-// We link statically, so it may not exist.
-if (typeof getDylinkMetadata !== 'undefined') {
-  Module['getDylinkMetadata'] = getDylinkMetadata;
-}
+// This file runs as --pre-js, before the runtime is defined, so export
+// it from a preRun callback.
+Module.preRun = Module.preRun || [];
+Module.preRun.push(function () {
+  if (typeof getDylinkMetadata !== 'undefined') {
+    Module['getDylinkMetadata'] = getDylinkMetadata;
+  }
+});
 
-// fzstd is loaded by an earlier --post-js (src/fzstd.umd.js); see
+// fzstd is loaded by an earlier --pre-js (src/fzstd.umd.js); see
 // CMakeLists.txt. Bundling avoids a runtime CDN fetch from the worker
 // thread where cross-origin XHR can be blocked by JupyterLite's
 // service worker.
@@ -24,7 +28,21 @@ if (typeof getDylinkMetadata !== 'undefined') {
 //
 // Failures here are logged but never throw — a kernel that boots
 // without Std/Lean/Sparkle/Hesper is still useful for Init-only code.
+//
+// This file is linked with --pre-js (after pre.js): newer emscripten
+// (4.x+) runs preRun before --post-js code executes, and aborts on
+// modifications of `Module.preRun` made after it was consumed.
+// The run-dependency helpers are runtime-internal and only assigned
+// after the pre-js code, so they are resolved at call time.
 // ---------------------------------------------------------------
+function xleanAddRunDependency(id) {
+  (typeof addRunDependency === 'function'
+    ? addRunDependency : Module.addRunDependency)(id);
+}
+function xleanRemoveRunDependency(id) {
+  (typeof removeRunDependency === 'function'
+    ? removeRunDependency : Module.removeRunDependency)(id);
+}
 Module.preRun = Module.preRun || [];
 Module.preRun.push(function () {
   'use strict';
@@ -108,7 +126,7 @@ Module.preRun.push(function () {
   candidates.push('./olean/');
 
   var depTag = 'olean-dynamic-load';
-  Module.addRunDependency(depTag);
+  xleanAddRunDependency(depTag);
 
   log('candidates: ' + JSON.stringify(candidates));
 
@@ -134,7 +152,7 @@ Module.preRun.push(function () {
     }
     if (!MANIFEST) {
       log('no manifest-v2.json — only embedded modules will work');
-      Module.removeRunDependency(depTag);
+      xleanRemoveRunDependency(depTag);
       return;
     }
 
@@ -156,7 +174,7 @@ Module.preRun.push(function () {
     var hasFzstd = typeof fzstd !== 'undefined' && typeof fzstd.decompress === 'function';
     if (!hasNativeZstd && !hasFzstd) {
       log('no zstd decoder available (no DecompressionStream and no fzstd) — skipping');
-      Module.removeRunDependency(depTag);
+      xleanRemoveRunDependency(depTag);
       return;
     }
     log('zstd decoder: ' + (hasNativeZstd ? 'native DecompressionStream' : 'fzstd (pure JS)'));
@@ -789,9 +807,9 @@ Module.preRun.push(function () {
     };
   };
 
-    Module.removeRunDependency(depTag);
+    xleanRemoveRunDependency(depTag);
   })().catch(function (err) {
     log('loadOleans crashed: ' + err);
-    try { Module.removeRunDependency(depTag); } catch (_) {}
+    try { xleanRemoveRunDependency(depTag); } catch (_) {}
   });
 });
